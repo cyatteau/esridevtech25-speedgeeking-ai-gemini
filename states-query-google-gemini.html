@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>States Layer - AI Google Gemini</title>
+    <link
+      rel="stylesheet"
+      href="https://js.arcgis.com/4.32/esri/themes/light/main.css"
+    />
+    <script>
+      var esriConfig = { apiKey: 'your_arcgis_key' }
+    </script>
+    <script
+      type="module"
+      src="https://js.arcgis.com/calcite-components/3.0.3/calcite.esm.js"
+    ></script>
+    <script src="https://js.arcgis.com/4.32/"></script>
+    <script
+      type="module"
+      src="https://js.arcgis.com/map-components/4.32/arcgis-map-components.esm.js"
+    ></script>
+    <style>
+      .main-container {
+        display: flex;
+        height: 100vh;
+      }
+      .left-column {
+        flex: 2;
+      }
+      .right-column {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 1rem;
+        overflow-y: auto;
+      }
+      arcgis-map {
+        height: 100%;
+        width: 100%;
+      }
+      #stateList,
+      #explanation {
+        font-family: Arial, sans-serif;
+        margin: 1rem 0;
+      }
+      #stateList {
+        list-style: none;
+        padding: 0;
+      }
+      #stateList li {
+        margin: 0.3rem 0;
+      }
+      .input-container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+      .input-container calcite-input {
+        flex: 1;
+        margin-right: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="main-container">
+      <div class="left-column">
+        <arcgis-map id="map" basemap="arcgis/streets" center="20,0" zoom="1">
+          <arcgis-zoom position="top-left"></arcgis-zoom>
+        </arcgis-map>
+      </div>
+      <div class="right-column">
+        <div class="input-container">
+          <calcite-input
+            id="userInput"
+            placeholder="E.g., List the top 3 hottest states"
+          ></calcite-input>
+          <calcite-button id="submitQuery">Submit</calcite-button>
+        </div>
+        <ul id="stateList"></ul>
+        <div id="explanation"></div>
+      </div>
+    </div>
+    <script type="module">
+      import { config } from './config.js'
+      esriConfig.apiKey = config.arcgisApiKey
+      const googleGeminiApiKey = config.googleGeminiApiKey
+      // To switch from countries to states, change this URL and the query field below.
+      const featureLayerURL =
+        'https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_States_Generalized_Boundaries/FeatureServer/0'
+      const mapEl = document.getElementById('map')
+      const stateListEl = document.getElementById('stateList')
+      const explanationEl = document.getElementById('explanation')
+      let currentHighlightLayer = null
+      mapEl.addEventListener('arcgisViewReadyChange', () => {
+        const view = mapEl.view
+      })
+      const fetchStatesFromQuery = async query => {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleGeminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    {
+                      text:
+                        query +
+                        " only list the state names in a numbered list, then on a new line start with 'Explanation:' and provide a one-sentence explanation for why these states were chosen."
+                    }
+                  ]
+                }
+              ]
+            })
+          }
+        )
+        const data = await res.json()
+        const lines = data.candidates[0].content.parts[0].text.split('\n')
+        const states = []
+        let explanation = ''
+        for (let line of lines) {
+          line = line.replace(/^\d+\.?\s*/g, '').trim()
+          if (line.toLowerCase().startsWith('explanation:'))
+            explanation = line.replace(/explanation:\s*/i, '')
+          else if (/^[a-zA-Z\s]+$/.test(line) && line) states.push(line)
+        }
+        return { states, explanation }
+      }
+      const highlightStates = async states => {
+        if (currentHighlightLayer) mapEl.map.remove(currentHighlightLayer)
+        const query = `STATE_NAME IN (${states
+          .map(c => `'${c.replace(/'/g, "''")}'`)
+          .join(',')})`
+        const [FeatureLayer, Graphic, GraphicsLayer] = await Promise.all([
+          $arcgis.import('esri/layers/FeatureLayer'),
+          $arcgis.import('esri/Graphic'),
+          $arcgis.import('esri/layers/GraphicsLayer')
+        ])
+        const fl = new FeatureLayer({
+          url: featureLayerURL,
+          token: config.arcgisApiKey
+        })
+        const queryParams = {
+          where: query,
+          outFields: ['*'],
+          returnGeometry: true
+        }
+        const result = await fl.queryFeatures(queryParams)
+        const highlightLayer = new GraphicsLayer()
+        result.features.forEach(feature => {
+          const graphic = new Graphic({
+            geometry: feature.geometry,
+            attributes: feature.attributes,
+            symbol: {
+              type: 'simple-fill',
+              color: [255, 0, 0, 0.5],
+              outline: { color: 'red', width: 2 }
+            }
+          })
+          highlightLayer.add(graphic)
+        })
+        currentHighlightLayer = highlightLayer
+        mapEl.map.add(highlightLayer)
+      }
+      const displayStates = states => {
+        stateListEl.innerHTML = states
+          .map(state => `<li>${state}</li>`)
+          .join('')
+      }
+      const displayExplanation = explanation => {
+        explanationEl.innerHTML = explanation
+      }
+      document
+        .getElementById('submitQuery')
+        .addEventListener('click', async () => {
+          const userQuery = document.getElementById('userInput').value.trim()
+          if (!userQuery) return
+          const { states, explanation } = await fetchStatesFromQuery(userQuery)
+          if (states.length) {
+            await highlightStates(states)
+            displayStates(states)
+            displayExplanation(explanation)
+          }
+        })
+    </script>
+  </body>
+</html>

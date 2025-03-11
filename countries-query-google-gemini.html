@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Countries Layer - AI Google Gemini</title>
+    <link
+      rel="stylesheet"
+      href="https://js.arcgis.com/4.32/esri/themes/light/main.css"
+    />
+    <script>
+      var esriConfig = { apiKey: 'your_arcgis_key' }
+    </script>
+    <script
+      type="module"
+      src="https://js.arcgis.com/calcite-components/3.0.3/calcite.esm.js"
+    ></script>
+    <script src="https://js.arcgis.com/4.32/"></script>
+    <script
+      type="module"
+      src="https://js.arcgis.com/map-components/4.32/arcgis-map-components.esm.js"
+    ></script>
+    <style>
+      .main-container {
+        display: flex;
+        height: 100vh;
+      }
+      .left-column {
+        flex: 2;
+      }
+      .right-column {
+        flex: 1;
+        padding: 1rem;
+        overflow-y: auto;
+      }
+      arcgis-map {
+        height: 100%;
+        width: 100%;
+      }
+      #countryList {
+        font-family: Arial, sans-serif;
+        margin: 1rem 0;
+        padding: 0;
+        list-style: none;
+      }
+      #countryList li {
+        margin: 0.3rem 0;
+      }
+      #explanation {
+        font-family: Arial, sans-serif;
+        margin: 1rem 0;
+        padding: 0.5rem;
+        background: #f0f0f0;
+      }
+      .input-container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+      .input-container calcite-input {
+        flex: 1;
+        margin-right: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="main-container">
+      <div class="left-column">
+        <arcgis-map id="map" basemap="arcgis/community" center="20,0" zoom="1">
+          <arcgis-zoom position="top-left"></arcgis-zoom>
+        </arcgis-map>
+      </div>
+      <div class="right-column">
+        <div class="input-container">
+          <calcite-input
+            id="userInput"
+            placeholder="E.g., List the top 3 hottest countries"
+          ></calcite-input>
+          <calcite-button id="submitQuery">Submit</calcite-button>
+        </div>
+        <ul id="countryList"></ul>
+        <div id="explanation"></div>
+      </div>
+    </div>
+    <script type="module">
+      import { config } from './config.js'
+      esriConfig.apiKey = config.arcgisApiKey
+      const googleGeminiApiKey = config.googleGeminiApiKey
+      const featureLayerURL =
+        'https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/World_Countries_(Generalized)/FeatureServer/0'
+      const mapEl = document.getElementById('map')
+      const countryListEl = document.getElementById('countryList')
+      const explanationEl = document.getElementById('explanation')
+      let currentHighlightLayer = null
+
+      mapEl.addEventListener('arcgisViewReadyChange', () => {})
+
+      const fetchCountriesFromQuery = async q => {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleGeminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    {
+                      text:
+                        q +
+                        " only list the country names in the response in a numbered list, then on a new line start with 'Explanation:' and provide a one-sentence explanation for why these states were chosen."
+                    }
+                  ]
+                }
+              ]
+            })
+          }
+        )
+        const data = await res.json()
+        const lines = data.candidates[0].content.parts[0].text.split('\n')
+        let countries = [],
+          explanation = ''
+        for (let line of lines) {
+          line = line.replace(/^\d+\.?\s*/g, '').trim()
+          if (line.toLowerCase().startsWith('explanation:'))
+            explanation = line.replace(/explanation:\s*/i, '')
+          else if (/^[a-zA-Z\s]+$/.test(line) && line) countries.push(line)
+        }
+        return { countries, explanation }
+      }
+
+      const highlightCountries = async countries => {
+        if (currentHighlightLayer) mapEl.map.remove(currentHighlightLayer)
+        const q = `COUNTRY IN (${countries
+          .map(c => `'${c.replace(/'/g, "''")}'`)
+          .join(',')})`
+        const [FeatureLayer, Graphic, GraphicsLayer] = await Promise.all([
+          $arcgis.import('esri/layers/FeatureLayer'),
+          $arcgis.import('esri/Graphic'),
+          $arcgis.import('esri/layers/GraphicsLayer')
+        ])
+        const fl = new FeatureLayer({
+          url: featureLayerURL,
+          token: config.arcgisApiKey
+        })
+        const qp = { where: q, outFields: ['*'], returnGeometry: true }
+        const result = await fl.queryFeatures(qp)
+        const hlLayer = new GraphicsLayer()
+        result.features.forEach(f => {
+          const g = new Graphic({
+            geometry: f.geometry,
+            attributes: f.attributes,
+            symbol: {
+              type: 'simple-fill',
+              color: [255, 0, 0, 0.5],
+              outline: { color: 'red', width: 2 }
+            }
+          })
+          hlLayer.add(g)
+        })
+        currentHighlightLayer = hlLayer
+        mapEl.map.add(hlLayer)
+      }
+
+      const displayCountries = countries =>
+        (countryListEl.innerHTML = countries.map(c => `<li>${c}</li>`).join(''))
+      const displayExplanation = exp => (explanationEl.innerHTML = exp)
+
+      document
+        .getElementById('submitQuery')
+        .addEventListener('click', async () => {
+          const q = document.getElementById('userInput').value.trim()
+          if (!q) return
+          const { countries, explanation } = await fetchCountriesFromQuery(q)
+          if (countries.length) {
+            await highlightCountries(countries)
+            displayCountries(countries)
+            displayExplanation(explanation)
+          }
+        })
+    </script>
+  </body>
+</html>
