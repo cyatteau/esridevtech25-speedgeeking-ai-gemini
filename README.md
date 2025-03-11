@@ -99,4 +99,8 @@ Keep queries short to save costs. Google offers a free tier for testing. See the
 
 These demos are provided under the [MIT License](LICENSE) (or whichever license you choose to include). Feel free to modify and adapt them for your own presentations, demos, or projects.
 
+## YouTube Video Tutorial
+
+Check out my [video version](https://www.youtube.com/watch?v=MbfRpU8-Ya0) of this app using Esri Leaflet!
+
 **Enjoy exploring AI-driven geospatial visualizations!**
