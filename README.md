@@ -75,6 +75,24 @@ The AI will parse your request, return relevant geographic names, and highlight 
 
 - If the map does not update or you see an error, ensure you have valid **Google Gemini** and **ArcGIS** API keys, and check your **browser console** for any relevant error messages.
 
+## Gemini API Pricing (Gemini 1.5 Flash)
+This application uses the gemini-1.5-flash model. Here's a quick overview of its pricing:
+- **Input Price:** $0.075 per 1 million tokens (prompts <= 128k tokens), $0.15 (prompts > 128k tokens)
+- **Output Price:** $0.30 per 1 million tokens (prompts <= 128k tokens), $0.60 (prompts > 128k tokens)
+- **Context caching price:** $0.01875, prompts <= 128k tokens, $0.0375, prompts > 128k tokens.
+- **Context caching storage:** $1.00 per hour.
+
+### Token Usage and Pricing Explained
+
+Gemini API costs are based on "tokens," which are pieces of words.
+
+* **Input Tokens:** Your question's length.
+* **Output Tokens:** Gemini's answer length.
+
+Longer questions and answers = more tokens = higher cost.
+
+Keep queries short to save costs. Google offers a free tier for testing. See the [Gemini API pricing page](https://ai.google.dev/gemini-api/docs/pricing) for details.
+
 ## License
 
 These demos are provided under the [MIT License](LICENSE) (or whichever license you choose to include). Feel free to modify and adapt them for your own presentations, demos, or projects.
