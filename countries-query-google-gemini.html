@@ -93,8 +93,6 @@
       const explanationEl = document.getElementById('explanation')
       let currentHighlightLayer = null
 
-      mapEl.addEventListener('arcgisViewReadyChange', () => {})
-
       const fetchCountriesFromQuery = async q => {
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleGeminiApiKey}`,

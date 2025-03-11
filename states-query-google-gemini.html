@@ -85,16 +85,13 @@
       import { config } from './config.js'
       esriConfig.apiKey = config.arcgisApiKey
       const googleGeminiApiKey = config.googleGeminiApiKey
-      // To switch from countries to states, change this URL and the query field below.
       const featureLayerURL =
         'https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_States_Generalized_Boundaries/FeatureServer/0'
       const mapEl = document.getElementById('map')
       const stateListEl = document.getElementById('stateList')
       const explanationEl = document.getElementById('explanation')
       let currentHighlightLayer = null
-      mapEl.addEventListener('arcgisViewReadyChange', () => {
-        const view = mapEl.view
-      })
+
       const fetchStatesFromQuery = async query => {
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleGeminiApiKey}`,
