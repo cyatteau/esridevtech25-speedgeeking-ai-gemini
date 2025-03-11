@@ -23,7 +23,9 @@ This repository contains two simple web applications showcasing how to integrate
 
 1. **Clone or Download** this repository.
 
-2. **Edit `config.js`** and set:
+2.  **Obtain API keys**: Visit [Google AI Studio](https://aistudio.google.com/) and [ArcGIS Location Platform](location.arcgis.com) to obtain your own Google Gemini and ArcGIS API keys.
+
+3. **Edit `config.js`** and set:
    ```js
    export const config = {
      googleGeminiApiKey: "YOUR_GOOGLE_GEMINI_API_KEY",
